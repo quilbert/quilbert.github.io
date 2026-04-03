@@ -398,9 +398,6 @@
 </style>
 </head>
 <body>
-
-<h1>~ Quilbert's Wizard Lab ~</h1>
-
 <div id="lab-container">
   <div id="tilemap"></div>
 
@@ -584,10 +581,30 @@ stationLabels.forEach(s => {
 
 // === QUILBERT ANIMATION ===
 const quilbert = document.getElementById('quilbert');
+const quilbertSprite = document.getElementById('quilbert-sprite');
 const taskBubble = document.getElementById('task-bubble');
 const inkDrips = document.getElementById('ink-drips');
 const QSIZE = 120; // quilbert sprite size
 const QHALF = QSIZE / 2;
+
+// Quill sprite frames
+const QUILL_FRAMES = 10;
+let quillFrame = 0;
+let quillAnimInterval = null;
+
+function startQuillAnim(fps = 10) {
+  if (quillAnimInterval) clearInterval(quillAnimInterval);
+  quillAnimInterval = setInterval(() => {
+    quillFrame = (quillFrame + 1) % QUILL_FRAMES;
+    quilbertSprite.src = `sprites/quill_${quillFrame}.png`;
+  }, 1000 / fps);
+}
+
+function stopQuillAnim() {
+  if (quillAnimInterval) { clearInterval(quillAnimInterval); quillAnimInterval = null; }
+  quillFrame = 0;
+  quilbertSprite.src = 'sprites/quill_0.png';
+}
 
 const stations = [
   { col: 3, row: 2, task: 'Brewing enchanted ink...', anim: 'brewing', label: 'label-potions' },
@@ -639,10 +656,12 @@ function moveToStation(idx) {
   // Move quilbert
   quilbert.style.left = x + 'px';
   quilbert.style.top = y + 'px';
+  startQuillAnim(14); // faster during travel
 
   // After arriving, show task
   setTimeout(() => {
     quilbert.className = station.anim;
+    startQuillAnim(6); // slow idle at station
     taskBubble.textContent = station.task;
     taskBubble.style.left = (x + QHALF) + 'px';
     taskBubble.style.top = (y - 10) + 'px';
@@ -717,6 +736,7 @@ function advanceStation() {
 }
 
 // Start!
+quilbertSprite.src = 'sprites/quill_0.png';
 moveToStation(0);
 setTimeout(advanceStation, 500);
 </script>
