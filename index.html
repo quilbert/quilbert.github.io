@@ -395,6 +395,16 @@
     0%, 100% { opacity: 0.6; transform: scale(1); }
     50% { opacity: 1; transform: scale(1.1); }
   }
+
+  /* Mobile: let the room overflow so you can pan to find Quilbert */
+  @media (max-width: 1029px) {
+    body {
+      overflow: auto;
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -739,6 +749,14 @@ function advanceStation() {
 quilbertSprite.src = 'sprites/quill_0.png';
 moveToStation(0);
 setTimeout(advanceStation, 500);
+
+// On mobile, start scrolled to center of room so there's room to explore
+if (window.innerWidth <= 1029) {
+  window.scrollTo(
+    Math.max(0, (COLS * TILE - window.innerWidth) / 2),
+    Math.max(0, (ROWS * TILE - window.innerHeight) / 2)
+  );
+}
 </script>
 
 </body>
