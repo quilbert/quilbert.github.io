@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quilbert's Wizard Lab</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a12;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+  }
+
+  h1 {
+    color: #8888cc;
+    font-size: 1.6em;
+    margin-bottom: 12px;
+    text-shadow: 0 0 20px #6666aa88;
+    letter-spacing: 3px;
+  }
+
+  #lab-container {
+    position: relative;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: 3px solid #333;
+    box-shadow: 0 0 40px #22225588, 0 0 80px #11113344;
+  }
+
+  #tilemap {
+    display: grid;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  .tile {
+    width: 64px;
+    height: 64px;
+    background-size: 64px 64px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    position: relative;
+  }
+
+  .tile.torch::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('sprites/torch_0.png') no-repeat center center;
+    background-size: 64px 64px;
+    image-rendering: pixelated;
+    animation: torchFlicker 0.6s steps(1) infinite;
+    z-index: 2;
+  }
+
+  @keyframes torchFlicker {
+    0%   { background-image: url('sprites/torch_0.png'); filter: brightness(1); }
+    20%  { background-image: url('sprites/torch_1.png'); filter: brightness(1.1); }
+    40%  { background-image: url('sprites/torch_2.png'); filter: brightness(0.95); }
+    60%  { background-image: url('sprites/torch_3.png'); filter: brightness(1.05); }
+    80%  { background-image: url('sprites/torch_4.png'); filter: brightness(1); }
+  }
+
+  /* Object layer */
+  .object {
+    position: absolute;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .object img {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
+  }
+
+  /* Station labels */
+  .station-label {
+    position: absolute;
+    color: #aaaadd;
+    font-size: 10px;
+    text-align: center;
+    white-space: nowrap;
+    z-index: 10;
+    opacity: 0.5;
+    text-shadow: 0 0 4px #000, 0 1px 2px #000;
+    pointer-events: none;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .station-label.active {
+    opacity: 1;
+    color: #ddddff;
+    text-shadow: 0 0 8px #8888ff88;
+  }
+
+  /* Quilbert - the enchanted quill */
+  #quilbert {
+    position: absolute;
+    z-index: 20;
+    transition: left 1.8s cubic-bezier(0.4, 0, 0.2, 1), top 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+
+  #quilbert-sprite {
+    width: 120px;
+    height: 120px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    filter: drop-shadow(0 0 8px #9966dd) drop-shadow(0 0 16px #7744bb88) drop-shadow(0 0 24px #aa77ee44);
+    animation: quillFloat 2.5s ease-in-out infinite;
+    transform-origin: 30% 80%; /* pivot near the nib */
+  }
+
+  /* Ink drip particles from the nib */
+  #ink-drips {
+    position: absolute;
+    bottom: 10px;
+    left: 20px;
+    width: 4px;
+    height: 4px;
+    pointer-events: none;
+  }
+
+  .ink-drop {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #2244aa;
+    border-radius: 50%;
+    animation: inkDrip 1.5s ease-in forwards;
+    box-shadow: 0 0 4px #3366cc88;
+  }
+
+  @keyframes inkDrip {
+    0% { opacity: 0.9; transform: translateY(0) scale(1); }
+    60% { opacity: 0.6; transform: translateY(16px) scale(0.8); }
+    100% { opacity: 0; transform: translateY(28px) scale(0.3); }
+  }
+
+  /* Default: floating idle */
+  @keyframes quillFloat {
+    0%, 100% { transform: rotate(-5deg) translateY(0); }
+    50% { transform: rotate(5deg) translateY(-10px); }
+  }
+
+  @keyframes quillGlow {
+    0%, 100% { filter: drop-shadow(0 0 8px #9966dd) drop-shadow(0 0 16px #7744bb88); }
+    50% { filter: drop-shadow(0 0 14px #bb88ff) drop-shadow(0 0 24px #9966dd88) drop-shadow(0 0 36px #7744bb44); }
+  }
+
+  /* Writing: quick back-and-forth scratching */
+  #quilbert.writing #quilbert-sprite {
+    animation: quillWrite 0.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 6px #4488ff) drop-shadow(0 0 14px #2266cc88);
+  }
+
+  @keyframes quillWrite {
+    0%, 100% { transform: rotate(-8deg) translateY(2px); }
+    25% { transform: rotate(0deg) translateY(4px) translateX(6px); }
+    50% { transform: rotate(-5deg) translateY(6px); }
+    75% { transform: rotate(3deg) translateY(4px) translateX(-4px); }
+  }
+
+  /* Brewing: dipping and stirring in a cauldron */
+  #quilbert.brewing #quilbert-sprite {
+    animation: quillStir 1.2s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px #88ff44) drop-shadow(0 0 16px #66cc2288);
+  }
+
+  @keyframes quillStir {
+    0%, 100% { transform: rotate(-5deg) translateY(0); }
+    25% { transform: rotate(10deg) translateY(8px) translateX(5px); }
+    50% { transform: rotate(20deg) translateY(12px); }
+    75% { transform: rotate(5deg) translateY(8px) translateX(-5px); }
+  }
+
+  /* Reading: gentle rocking hover over books */
+  #quilbert.reading #quilbert-sprite {
+    animation: quillRead 3s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px #ffaa44) drop-shadow(0 0 16px #cc882288);
+  }
+
+  @keyframes quillRead {
+    0%, 100% { transform: rotate(-3deg) translateY(-4px); }
+    33% { transform: rotate(3deg) translateY(-8px) translateX(4px); }
+    66% { transform: rotate(-8deg) translateY(-6px) translateX(-4px); }
+  }
+
+  /* Enchanting: dramatic spinning with color shift */
+  #quilbert.enchanting #quilbert-sprite {
+    animation: quillEnchant 2s ease-in-out infinite;
+  }
+
+  @keyframes quillEnchant {
+    0%, 100% {
+      transform: rotate(0deg) translateY(0);
+      filter: drop-shadow(0 0 10px #ff66ff) drop-shadow(0 0 20px #aa44ff88);
+    }
+    25% { transform: rotate(90deg) translateY(-12px); }
+    50% {
+      transform: rotate(180deg) translateY(-18px);
+      filter: drop-shadow(0 0 20px #ffaaff) drop-shadow(0 0 36px #cc66ff) drop-shadow(0 0 48px #8844cc88);
+    }
+    75% { transform: rotate(270deg) translateY(-12px); }
+  }
+
+  /* Scrying: slow tip-down hover over water */
+  #quilbert.scrying #quilbert-sprite {
+    animation: quillScry 2.5s ease-in-out infinite;
+  }
+
+  @keyframes quillScry {
+    0%, 100% {
+      transform: rotate(-10deg) translateY(-6px);
+      filter: drop-shadow(0 0 10px #44ddff) drop-shadow(0 0 20px #22aadd88);
+    }
+    50% {
+      transform: rotate(10deg) translateY(4px);
+      filter: drop-shadow(0 0 18px #88eeff) drop-shadow(0 0 30px #44ccff) drop-shadow(0 0 42px #2288aa88);
+    }
+  }
+
+  /* Sparkle particles */
+  .sparkle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #aaccff;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 19;
+    animation: sparkleFade 0.8s ease-out forwards;
+  }
+
+  @keyframes sparkleFade {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0) translateY(-20px); }
+  }
+
+  /* Task bubble */
+  #task-bubble {
+    position: absolute;
+    z-index: 30;
+    background: #1a1a2e;
+    border: 2px solid #4444aa;
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #ccccee;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+    box-shadow: 0 0 12px #333366aa;
+  }
+
+  #task-bubble.visible {
+    opacity: 1;
+  }
+
+  #task-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #4444aa;
+  }
+
+  /* Fountain animation */
+  .fountain-anim {
+    animation: fountainBubble 1.2s steps(1) infinite;
+  }
+
+  @keyframes fountainBubble {
+    0%, 49% { content: url('sprites/fountain.png'); }
+    50%, 100% { content: url('sprites/fountain_2.png'); }
+  }
+
+  /* Ambient wisp */
+  .ambient-wisp {
+    position: absolute;
+    z-index: 8;
+    pointer-events: none;
+    opacity: 0.6;
+    image-rendering: pixelated;
+  }
+
+  .ambient-wisp img {
+    image-rendering: pixelated;
+    width: 48px;
+    height: 48px;
+  }
+
+  #wisp1 {
+    animation: wispDrift1 12s ease-in-out infinite;
+  }
+
+  @keyframes wispDrift1 {
+    0%, 100% { left: 200px; top: 180px; opacity: 0.3; }
+    25% { left: 400px; top: 120px; opacity: 0.6; }
+    50% { left: 600px; top: 200px; opacity: 0.4; }
+    75% { left: 350px; top: 280px; opacity: 0.5; }
+  }
+
+  #wisp2 {
+    animation: wispDrift2 15s ease-in-out infinite;
+  }
+
+  @keyframes wispDrift2 {
+    0%, 100% { left: 700px; top: 350px; opacity: 0.2; }
+    25% { left: 500px; top: 400px; opacity: 0.5; }
+    50% { left: 300px; top: 300px; opacity: 0.3; }
+    75% { left: 550px; top: 150px; opacity: 0.4; }
+  }
+
+  /* Butterfly */
+  #butterfly {
+    position: absolute;
+    z-index: 8;
+    pointer-events: none;
+    animation: butterflyFly 20s ease-in-out infinite;
+  }
+
+  #butterfly img {
+    image-rendering: pixelated;
+    width: 32px;
+    height: 32px;
+    animation: butterflyWing 0.3s steps(1) infinite;
+  }
+
+  @keyframes butterflyFly {
+    0%, 100% { left: 150px; top: 150px; }
+    10% { left: 300px; top: 100px; }
+    20% { left: 500px; top: 180px; }
+    30% { left: 700px; top: 120px; }
+    40% { left: 800px; top: 300px; }
+    50% { left: 650px; top: 450px; }
+    60% { left: 400px; top: 400px; }
+    70% { left: 200px; top: 350px; }
+    80% { left: 100px; top: 250px; }
+    90% { left: 250px; top: 200px; }
+  }
+
+  @keyframes butterflyWing {
+    0%, 49% { transform: scaleX(1); }
+    50%, 100% { transform: scaleX(-1); }
+  }
+
+  /* Potion bubbles effect */
+  .potion-bubble {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: #88ffaa;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 7;
+    animation: potionBubbleRise 2s ease-out infinite;
+    opacity: 0.7;
+  }
+
+  @keyframes potionBubbleRise {
+    0% { transform: translateY(0) scale(1); opacity: 0.7; }
+    100% { transform: translateY(-30px) scale(0.3); opacity: 0; }
+  }
+
+  /* Ambient light from torches */
+  .torch-glow {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle, #ff880015 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 1;
+    animation: torchGlowPulse 3s ease-in-out infinite;
+  }
+
+  @keyframes torchGlowPulse {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+  }
+</style>
+</head>
+<body>
+
+<h1>~ Quilbert's Wizard Lab ~</h1>
+
+<div id="lab-container">
+  <div id="tilemap"></div>
+
+  <!-- Ambient creatures -->
+  <div class="ambient-wisp" id="wisp1"><img src="sprites/wisp.png" alt=""></div>
+  <div class="ambient-wisp" id="wisp2"><img src="sprites/battlesphere.png" alt=""></div>
+  <div id="butterfly"><img src="sprites/butterfly.png" alt=""></div>
+
+  <!-- Quilbert -->
+  <div id="quilbert">
+    <img id="quilbert-sprite" src="sprites/quilbert.png" alt="Quilbert the Enchanted Quill">
+    <div id="ink-drips"></div>
+  </div>
+
+  <!-- Task bubble -->
+  <div id="task-bubble"></div>
+</div>
+
+<script>
+const TILE = 64;
+const COLS = 16;
+const ROWS = 11;
+
+// Tilemap: 'w' = wall, 'f' = floor, 'd' = door, 't' = torch-wall
+const map = [
+  'w','w','t','w','w','w','w','t','w','w','w','w','t','w','w','w',
+  'w','f','f','f','f','f','f','f','f','f','f','f','f','f','f','w',
+  'w','f','f','f','f','f','f','f','f','f','f','f','f','f','f','w',
+  't','f','f','f','f','f','f','f','f','f','f','f','f','f','f','t',
+  'w','f','f','f','f','f','f','f','f','f','f','f','f','f','f','w',
+  'w','f','f','f','f','f','f','f','f','f','f','f','f','f','f','w',
+  't','f','f','f','f','f','f','f','f','f','f','f','f','f','f','t',
+  'w','f','f','f','f','f','f','f','f','f','f','f','f','f','f','w',
+  'w','f','f','f','f','f','f','f','f','f','f','f','f','f','f','w',
+  'w','f','f','f','f','f','f','f','f','f','f','f','f','f','f','w',
+  'w','w','w','w','w','w','w','d','d','w','w','w','w','w','w','w',
+];
+
+// Seed RNG for consistent tile variation
+function seededRand(x, y) {
+  let h = (x * 374761393 + y * 668265263 + 1274126177) & 0xffffffff;
+  h = ((h ^ (h >> 13)) * 1274126177) & 0xffffffff;
+  return (h & 0xffffffff) >>> 0;
+}
+
+// Build tilemap
+const tilemap = document.getElementById('tilemap');
+tilemap.style.gridTemplateColumns = `repeat(${COLS}, ${TILE}px)`;
+tilemap.style.gridTemplateRows = `repeat(${ROWS}, ${TILE}px)`;
+tilemap.style.width = `${COLS * TILE}px`;
+tilemap.style.height = `${ROWS * TILE}px`;
+
+const container = document.getElementById('lab-container');
+container.style.width = `${COLS * TILE}px`;
+container.style.height = `${ROWS * TILE}px`;
+
+for (let r = 0; r < ROWS; r++) {
+  for (let c = 0; c < COLS; c++) {
+    const cell = map[r * COLS + c];
+    const div = document.createElement('div');
+    div.className = 'tile';
+    const v = seededRand(c, r);
+
+    if (cell === 'w') {
+      div.style.backgroundImage = `url('sprites/wall_${v % 6}.png')`;
+    } else if (cell === 't') {
+      div.style.backgroundImage = `url('sprites/wall_${v % 6}.png')`;
+      div.classList.add('torch');
+      // Add torch glow
+      const glow = document.createElement('div');
+      glow.className = 'torch-glow';
+      glow.style.left = (c * TILE - 28) + 'px';
+      glow.style.top = (r * TILE - 28) + 'px';
+      glow.style.animationDelay = (v % 3) + 's';
+      container.appendChild(glow);
+    } else if (cell === 'd') {
+      div.style.backgroundImage = `url('sprites/runed_door.png')`;
+    } else {
+      div.style.backgroundImage = `url('sprites/floor_${v % 6}.png')`;
+    }
+
+    tilemap.appendChild(div);
+  }
+}
+
+// Place objects helper
+function placeSprite(src, col, row, w, h, extraStyle) {
+  const obj = document.createElement('div');
+  obj.className = 'object';
+  obj.style.left = (col * TILE + (TILE - w) / 2) + 'px';
+  obj.style.top = (row * TILE + (TILE - h) / 2) + 'px';
+  const img = document.createElement('img');
+  img.src = `sprites/${src}`;
+  img.style.width = w + 'px';
+  img.style.height = h + 'px';
+  if (extraStyle) Object.assign(img.style, extraStyle);
+  obj.appendChild(img);
+  container.appendChild(obj);
+  return obj;
+}
+
+// === STATION 1: Potion Brewing (top-left) ===
+placeSprite('altar_vehumet.png', 3, 2, 64, 64);
+placeSprite('potion_purple.png', 2, 2, 48, 48);
+placeSprite('potion_gold.png', 4, 2, 48, 48);
+placeSprite('potion_blue.png', 2, 3, 40, 40);
+placeSprite('potion_bubbly.png', 4, 3, 40, 40);
+placeSprite('shop_potions.png', 3, 1, 48, 48);
+
+// Bubbling effect near potions
+for (let i = 0; i < 5; i++) {
+  const bubble = document.createElement('div');
+  bubble.className = 'potion-bubble';
+  bubble.style.left = (3 * TILE + 10 + Math.random() * 44) + 'px';
+  bubble.style.top = (2 * TILE + 20) + 'px';
+  bubble.style.animationDelay = (i * 0.4) + 's';
+  const colors = ['#88ffaa', '#ffaa44', '#88aaff', '#ff88ff', '#aaffee'];
+  bubble.style.background = colors[i % colors.length];
+  container.appendChild(bubble);
+}
+
+// === STATION 2: Library (top-right) ===
+placeSprite('shop_books.png', 12, 1, 48, 48);
+placeSprite('book_blue.png', 11, 2, 48, 48);
+placeSprite('book_orange.png', 13, 2, 48, 48);
+placeSprite('scroll.png', 12, 2, 56, 56);
+placeSprite('scroll_blue.png', 11, 3, 44, 44);
+placeSprite('parchment.png', 13, 3, 44, 44);
+
+// === STATION 3: Enchanting Circle (center) ===
+placeSprite('altar_sif_muna.png', 7, 5, 64, 64);
+placeSprite('altar_sif_muna.png', 8, 5, 64, 64);
+placeSprite('orb.png', 7, 4, 48, 48);
+placeSprite('crystal.png', 9, 4, 48, 48);
+placeSprite('wand.png', 6, 5, 48, 48);
+placeSprite('staff.png', 10, 5, 48, 48);
+placeSprite('lantern.png', 6, 4, 44, 44);
+placeSprite('lamp.png', 10, 4, 44, 44);
+
+// === STATION 4: Scrying Pool (bottom-left) ===
+// Animated fountain - swap sprites
+const fountainObj = placeSprite('fountain.png', 3, 7, 64, 64);
+const fountainImg = fountainObj.querySelector('img');
+let fountainFrame = 0;
+setInterval(() => {
+  fountainFrame = 1 - fountainFrame;
+  fountainImg.src = `sprites/${fountainFrame ? 'fountain_2' : 'fountain'}.png`;
+}, 600);
+
+placeSprite('blue_fountain.png', 3, 8, 56, 56);
+placeSprite('crystal.png', 2, 7, 44, 44);
+placeSprite('orb_glow_0.png', 4, 7, 44, 44);
+
+// === STATION 5: Writing Desk (bottom-right) ===
+placeSprite('pedestal.png', 12, 7, 56, 56);
+placeSprite('blank_paper.png', 11, 7, 48, 48);
+placeSprite('parchment.png', 13, 7, 48, 48);
+placeSprite('scroll.png', 12, 8, 48, 48);
+placeSprite('book_blue.png', 11, 8, 44, 44);
+placeSprite('lantern.png', 13, 8, 44, 44);
+
+// Station labels
+const stationLabels = [
+  { text: 'Potion Brewing', col: 3, row: 1.3, id: 'label-potions' },
+  { text: 'Library', col: 12, row: 1.3, id: 'label-library' },
+  { text: 'Enchanting Circle', col: 8, row: 3.5, id: 'label-enchant' },
+  { text: 'Scrying Pool', col: 3, row: 6.4, id: 'label-scrying' },
+  { text: 'Writing Desk', col: 12, row: 6.4, id: 'label-writing' },
+];
+
+stationLabels.forEach(s => {
+  const label = document.createElement('div');
+  label.className = 'station-label';
+  label.id = s.id;
+  label.textContent = s.text;
+  label.style.left = (s.col * TILE + TILE / 2) + 'px';
+  label.style.top = (s.row * TILE) + 'px';
+  label.style.transform = 'translateX(-50%)';
+  container.appendChild(label);
+});
+
+// === QUILBERT ANIMATION ===
+const quilbert = document.getElementById('quilbert');
+const taskBubble = document.getElementById('task-bubble');
+const inkDrips = document.getElementById('ink-drips');
+const QSIZE = 120; // quilbert sprite size
+const QHALF = QSIZE / 2;
+
+const stations = [
+  { col: 3, row: 2, task: 'Brewing enchanted ink...', anim: 'brewing', label: 'label-potions' },
+  { col: 12, row: 2, task: 'Researching ancient spells...', anim: 'reading', label: 'label-library' },
+  { col: 8, row: 5, task: 'Imbuing magic into code...', anim: 'enchanting', label: 'label-enchant' },
+  { col: 3, row: 7, task: 'Reviewing pull requests...', anim: 'scrying', label: 'label-scrying' },
+  { col: 12, row: 7, task: 'Writing documentation...', anim: 'writing', label: 'label-writing' },
+];
+
+let currentStation = 0;
+let inkInterval = null;
+
+function spawnInkDrip() {
+  const drop = document.createElement('div');
+  drop.className = 'ink-drop';
+  drop.style.left = (Math.random() * 6 - 3) + 'px';
+  const colors = ['#2244aa', '#1a3388', '#3355cc', '#182866'];
+  drop.style.background = colors[Math.floor(Math.random() * colors.length)];
+  drop.style.width = (2 + Math.random() * 3) + 'px';
+  drop.style.height = drop.style.width;
+  inkDrips.appendChild(drop);
+  setTimeout(() => drop.remove(), 1500);
+}
+
+function startInkDrips() {
+  stopInkDrips();
+  inkInterval = setInterval(spawnInkDrip, 300);
+}
+
+function stopInkDrips() {
+  if (inkInterval) { clearInterval(inkInterval); inkInterval = null; }
+}
+
+function moveToStation(idx) {
+  const station = stations[idx];
+  const x = station.col * TILE + TILE / 2 - QHALF;
+  const y = station.row * TILE - QHALF - 16;
+
+  // Remove all anim classes
+  quilbert.className = '';
+  stopInkDrips();
+
+  // Clear labels
+  document.querySelectorAll('.station-label').forEach(l => l.classList.remove('active'));
+
+  // Hide bubble during travel
+  taskBubble.classList.remove('visible');
+
+  // Move quilbert
+  quilbert.style.left = x + 'px';
+  quilbert.style.top = y + 'px';
+
+  // After arriving, show task
+  setTimeout(() => {
+    quilbert.className = station.anim;
+    taskBubble.textContent = station.task;
+    taskBubble.style.left = (x + QHALF) + 'px';
+    taskBubble.style.top = (y - 10) + 'px';
+    taskBubble.style.transform = 'translateX(-50%)';
+    taskBubble.classList.add('visible');
+
+    // Activate station label
+    const label = document.getElementById(station.label);
+    if (label) label.classList.add('active');
+
+    // Spawn sparkles at station
+    spawnSparkles(x + QHALF, y + QHALF, 10);
+
+    // Start ink drips for writing/brewing
+    if (station.anim === 'writing' || station.anim === 'brewing') {
+      startInkDrips();
+    }
+  }, 2000);
+}
+
+function spawnSparkles(cx, cy, count) {
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const sparkle = document.createElement('div');
+      sparkle.className = 'sparkle';
+      sparkle.style.left = (cx + (Math.random() - 0.5) * 60) + 'px';
+      sparkle.style.top = (cy + (Math.random() - 0.5) * 60) + 'px';
+      const colors = ['#aaccff', '#ffaacc', '#aaffcc', '#ffddaa', '#ccaaff'];
+      sparkle.style.background = colors[Math.floor(Math.random() * colors.length)];
+      sparkle.style.width = (2 + Math.random() * 4) + 'px';
+      sparkle.style.height = sparkle.style.width;
+      container.appendChild(sparkle);
+      setTimeout(() => sparkle.remove(), 800);
+    }, i * 100);
+  }
+}
+
+// Sparkle trail during movement
+let sparkleInterval = null;
+function startSparkleTrail() {
+  sparkleInterval = setInterval(() => {
+    const rect = quilbert.getBoundingClientRect();
+    const contRect = container.getBoundingClientRect();
+    const x = rect.left - contRect.left + rect.width / 2;
+    const y = rect.top - contRect.top + rect.height / 2;
+    spawnSparkles(x, y, 1);
+  }, 120);
+}
+
+function stopSparkleTrail() {
+  if (sparkleInterval) {
+    clearInterval(sparkleInterval);
+    sparkleInterval = null;
+  }
+}
+
+// Main loop
+function advanceStation() {
+  stopSparkleTrail();
+  startSparkleTrail();
+  moveToStation(currentStation);
+
+  setTimeout(() => {
+    stopSparkleTrail();
+  }, 2000);
+
+  // Next station after task time
+  setTimeout(() => {
+    currentStation = (currentStation + 1) % stations.length;
+    advanceStation();
+  }, 6000);
+}
+
+// Start!
+moveToStation(0);
+setTimeout(advanceStation, 500);
+</script>
+
+</body>
+</html>
