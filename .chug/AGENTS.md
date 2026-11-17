@@ -1,0 +1,1 @@
+This folder holds files for chuggy, the system that runs tickets against this repository. `configurations/` declares what a ticket runs: the work, the checks and the review. Docs: https://raw.githubusercontent.com/kasofsk/chuggy-docs/main/llms.txt.
