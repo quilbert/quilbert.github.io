@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "name": "main",
+  "configuration": {
+    "version": 2,
+    "image": "node:24-bookworm",
+    "workloads": {
+      "work": {
+        "runner": "Agent",
+        "prompt": {
+          "path": ".chug/work.md"
+        },
+        "worker": {
+          "mode": {
+            "type": "SingleAgent",
+            "agent": "Claude",
+            "arguments": []
+          },
+          "setup": [
+            "git --version"
+          ],
+          "files": []
+        },
+        "authority": {
+          "credentials": [
+            "claude-code"
+          ]
+        }
+      },
+      "checks": {
+        "runner": "Commands",
+        "commands": [
+          "node -e \"const s=require('fs').readFileSync('index.html','utf8');const m=[...s.matchAll(/<script(?![^>]*src)[^>]*>([\\s\\S]*?)<\\/script>/g)];if(!m.length)throw new Error('no inline script');m.forEach(x=>new Function(x[1]))\"",
+          "node -e \"const fs=require('fs');const s=fs.readFileSync('index.html','utf8');const bad=[...new Set(s.match(/sprites\\/[A-Za-z0-9_-]+\\.png/g)||[])].filter(p=>!fs.existsSync(p));if(bad.length){console.error('missing sprites: '+bad.join(' '));process.exit(1)}\""
+        ],
+        "worker": {
+          "setup": [
+            "git --version"
+          ],
+          "files": []
+        }
+      },
+      "review": {
+        "runner": "Agent",
+        "purpose": "Review",
+        "reevaluate": "OnChange",
+        "prompt": {
+          "path": ".chug/review.md"
+        },
+        "worker": {
+          "mode": {
+            "type": "SingleAgent",
+            "agent": "Claude",
+            "arguments": []
+          },
+          "setup": [
+            "git --version"
+          ],
+          "files": []
+        },
+        "authority": {
+          "credentials": [
+            "claude-code"
+          ]
+        }
+      }
+    },
+    "plans": {
+      "standard": [
+        {
+          "name": "checks",
+          "evaluators": [
+            "checks"
+          ]
+        },
+        {
+          "name": "review",
+          "evaluators": [
+            "review"
+          ]
+        }
+      ]
+    },
+    "defaults": {
+      "work": "work",
+      "evaluation": "standard"
+    }
+  }
+}
